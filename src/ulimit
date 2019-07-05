@@ -1,0 +1,7 @@
+ulimit -n 31337
+ulimit -i unlimited
+ulimit -e unlimited
+ulimit -l unlimited
+ulimit -q unlimited
+ulimit -s unlimited
+ulimit -u unlimited

